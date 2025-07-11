@@ -1,114 +1,80 @@
-import os
-import sys
-from llama_cpp import Llama
+import requests
+import json
+import time
+import logging
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 class CodeExplainer:
-    def __init__(self, model_path=None):
-        if model_path is None:
-            # 모델 경로를 설정합니다
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            model_dir = os.path.join(os.path.dirname(current_dir), "models")
-
-            # 모델 디렉토리에서 .gguf 파일 찾기
-            model_files = [f for f in os.listdir(model_dir) if f.endswith('.gguf')]
-            if not model_files:
-                raise FileNotFoundError("모델 파일을 찾을 수 없습니다. models 디렉토리에 .gguf 파일이 있는지 확인하세요.")
-
-            # 첫 번째 모델 파일 사용
-            model_path = os.path.join(model_dir, model_files[0])
-
-        print(f"로컬 LLM 모델을 로드합니다: {os.path.basename(model_path)}...")
-
-        # 모델 초기화 (매개변수 최적화)
-        self.model = Llama(
-            model_path=model_path,
-            n_ctx=2048,  # 컨텍스트 크기
-            n_batch=512,  # 배치 크기
-            n_gpu_layers=0,  # GPU 없으면 0, 있으면 -1
-            verbose=False,  # 디버그 출력 끄기
-        )
-
-    def explain_code(self, code, language=None):
+    def __init__(self, model_name="qwen2.5-coder", ollama_base_url="http://localhost:11434"):
         """
-        코드를 분석하고 설명합니다.
+        코드 설명 클래스 초기화
+        
+        Args:
+            model_name (str): 사용할 Ollama 모델 이름
+            ollama_base_url (str): Ollama API 서버 URL
+        """
+        self.model_name = model_name
+        self.ollama_base_url = ollama_base_url
+        self.api_url = f"{ollama_base_url}/api/generate"
+        logger.info(f"CodeExplainer initialized with model: {model_name}")
+        
+        # 모델이 준비되었는지 확인
+        self._check_model_availability()
 
+    def _check_model_availability(self):
+        """모델이 로컬에 있는지 확인하고, 없으면 다운로드될 것임을 알림"""
+        try:
+            response = requests.get(f"{self.ollama_base_url}/api/tags")
+            models = response.json().get("models", [])
+            available_models = [model["name"] for model in models]
+            
+            if self.model_name not in available_models:
+                logger.warning(f"Model {self.model_name} is not available locally. It will be downloaded on first use.")
+            else:
+                logger.info(f"Model {self.model_name} is available locally.")
+        except Exception as e:
+            logger.error(f"Failed to check model availability: {e}")
+            logger.warning("Make sure Ollama server is running at: " + self.ollama_base_url)
+    
+    def explain_code(self, code, language=None, timeout=300):
+        """
+        코드를 분석하고 설명 생성
+        
         Args:
             code (str): 설명할 코드
-            language (str, optional): 프로그래밍 언어. None이면 자동 감지
-
+            language (str, optional): 코드 언어 (예: "python", "javascript")
+            timeout (int): 요청 타임아웃 시간(초)
+            
         Returns:
-            str: 코드 설명
+            str: 코드에 대한 설명
         """
-        lang_str = f"{language} " if language else ""
-        prompt = (
-            f"아래 {lang_str}코드를 분석하고 한국어로 명확하게 설명해주세요.\n\n"
-            f"코드:\n{code}\n\n"
-            "다음 구조로 설명해주세요: "
-            "1. 코드 개요: 이 코드가 무엇을 하는지 간략히 설명 "
-            "2. 주요 기능 및 구성 요소: 중요한 부분들을 설명 "
-            "3. 실행 흐름: 코드가 어떻게 실행되는지 순서대로 설명 "
-            "4. 개선 가능성: 더 나은 구현 방법 제안 (있는 경우)\n"
-            "설명:"
-        )
-        print("\n처리 중입니다. 이 작업은 하드웨어에 따라 시간이 걸릴 수 있습니다...\n")
-        output = self.model(
-            prompt,
-            max_tokens=512,
-            temperature=0.2,
-            top_p=0.9,
-            repeat_penalty=1.2,
-            stop=["```"],
-            echo = False
-        )
-        explanation = output['choices']['text'].strip()
-        explanation = self._remove_repetitions(explanation)
-        return explanation
+        if not code.strip():
+            return "설명할 코드가 없습니다."
+        
+        lang_info = f"{language} " if language else ""
+        prompt = f"""다음 {lang_info}코드를 상세히 분석하고 설명해주세요:
+        {code}
+        다음 형식으로 설명해주세요 :
+        1. 코드의 목적과 기능 2. 주요 로직 설명 3. 함수와 변수의 역할 4. 주의할 점이나 개선할 수 있는 부분"""
 
-    def _remove_repetitions(self, text):
-        """반복되는 문단을 제거합니다"""
-        lines = text.split('\n')
-        unique_lines = []
-        for line in lines:
-            # 이미 2번 이상 나타난 줄은 건너뜁니다
-            if line.strip() and unique_lines.count(line) < 2:
-                unique_lines.append(line)
-        return '\n'.join(unique_lines)
+        try:
+            start_time = time.time()
+            response = requests.post(self.api_url, json={
+                "model": self.model_name,
+                "prompt": prompt,
+                "stream": True
+            }, timeout=timeout)
 
-
-def main():
-    # 코드 설명기 초기화
-    try:
-        explainer = CodeExplainer()
-    except Exception as e:
-        print(f"오류: {e}")
-        sys.exit(1)
-    # 코드 입력 받기
-    print("설명할 코드를 직접 입력하세요 (입력 완료 후 Ctrl+D 또는 Ctrl+Z를 누르세요):")
-    code_lines = []
-    try:
-        while True:
-            line = input()
-            code_lines.append(line)
-    except EOFError:
-        pass
-    code = '\n'.join(code_lines)
-    if not code.strip():
-        print("코드가 입력되지 않았습니다.")
-        sys.exit(1)
-    # 언어 입력 받기
-    language = input("프로그래밍 언어를 입력하세요 (자동 감지하려면 Enter): ")
-    if not language.strip():
-        language = None
-    # 코드 설명
-    try:
-        explanation = explainer.explain_code(code, language)
-        print("\n=== 코드 설명 ===\n")
-        print(explanation)
-    except Exception as e:
-        print(f"코드 설명 중 오류가 발생했습니다: {e}")
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
+            response.raise_for_status()
+            result = response.json()
+            elapsed_time = time.time() - start_time
+            logger.info(f"Code explanation generated in {elapsed_time:.2f} seconds")
+            return result["response"]
+        except requests.exceptions.Timeout:
+            logger.error(f"Request timed out after {timeout} seconds")
+            return "요청 시간이 초과되었습니다. 더 짧은 코드로 다시 시도해보세요."
+        except Exception as e:
+            logger.error(f"Error explaining code: {str(e)}")
+            return f"코드 설명 중 오류가 발생했습니다: {str(e)}"
