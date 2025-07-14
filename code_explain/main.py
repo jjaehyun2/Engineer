@@ -21,20 +21,16 @@ def main():
 
     explainer = CodeExplainer(model_name=model_name, ollama_base_url=ollama_url)
     
-    # 파일 경로가 제공된 경우
     if args.file:
         file_path = args.file
         try:
-            # 파일이 존재하는지 확인
             if not os.path.exists(file_path):
                 print(f"can't find file: {file_path}")
                 return 1
                 
-            # 파일에서 코드 읽기
             with open(file_path, 'r', encoding='utf-8') as file:
                 code = file.read()
                 
-            # 파일 확장자에서 언어 추측
             extension = os.path.splitext(file_path)[1].lower()
             language_map = {
                 '.py': 'Python',
@@ -53,10 +49,8 @@ def main():
             }
             language = language_map.get(extension)
             
-            # 코드 설명 생성
             explanation = explainer.explain_code(code, language)
             
-            # 결과 출력
             print("\n" + "="*50 + "\n")
             print(f"file: {file_path}")
             print(f"language: {language if language else 'auto-detected'}")
@@ -68,40 +62,38 @@ def main():
             print(f"Error occurred: {str(e)}")
             return 1
     else:
-        # 대화형 모드
-        print("Starting the code explanation tool. Type 'exit' or 'quit' to exit.")
-        print("Enter your code and press Enter on an empty line, then Ctrl+D (Unix) or Ctrl+Z (Windows) to generate an explanation.")
+        print("Starting the code explanation. Type 'exit' or 'quit' to exit.")
         
-        while True:
-            print("\nEnter your code (type 'exit' or 'quit' to exit):")
-            code_lines = []
-            
-            try:
-                while True:
-                    line = input()
-                    # 종료 조건 추가: 줄 중간에 exit 또는 quit 입력 시 종료
-                    if line.strip().lower() in ['exit', 'quit']:
-                        print("Exiting the code explanation tool.")
-                        return 0
-                    if line == "":
-                        # 빈 줄이면 입력 종료
-                        break
-                    code_lines.append(line)
-            except EOFError:
-                # Ctrl+D (Unix), Ctrl+Z (Windows) 입력 시 종료
-                pass  
-            
-            code = "\n".join(code_lines)
-            if not code.strip():
-                continue
-                
-            print("\n analyzing code...\n")
-            explanation = explainer.explain_code(code)
-            
-            print("\n" + "="*50 + "\n")
-            print(explanation)
-            print("\n" + "="*50)
-    
+    while True:
+        print("\nEnter your code (end input with an empty line, or type 'exit' or 'quit' to exit):")
+        code_lines = []
+        try:
+            first_line = input()
+            if first_line.strip().lower() in ['exit', 'quit']:
+                print("Exiting the code explanation tool.")
+                return 0
+            code_lines.append(first_line)
+            while True:
+                line = input()
+                if line.strip().lower() in ['exit', 'quit']:
+                    print("Exiting the code explanation.")
+                    return 0
+                if line == "":
+                    break
+                code_lines.append(line)
+        except EOFError:
+            break
+
+        code = "\n".join(code_lines).strip()
+        if not code:
+            continue
+
+        print("\n analyzing code...\n")
+        explanation = explainer.explain_code(code)
+        print("\n" + "="*50 + "\n")
+        print(explanation)
+        print("\n" + "="*50)
+
     return 0
 
 if __name__ == "__main__":

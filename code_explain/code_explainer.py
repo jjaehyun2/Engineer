@@ -4,15 +4,15 @@ import json
 import logging
 import os
 
-# 로그 설정
+# logging configuration
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
 class CodeExplainer:
-    """코드 설명 생성을 위한 클래스"""
+    """class for explaining code using an Ollama model"""
 
     def __init__(self, model_name="qwen2.5-coder", ollama_base_url="http://localhost:11434"):
         self.model_name = model_name
@@ -21,7 +21,7 @@ class CodeExplainer:
 
         logger.info(f"CodeExplainer initialized with model: {model_name}")
 
-        # 모델 가용성 확인
+        # Check model availability
         try:
             response = requests.get(f"{ollama_base_url}/api/tags")
             if response.status_code == 200:
@@ -36,7 +36,7 @@ class CodeExplainer:
             logger.warning(f"Error checking model availability: {str(e)}")
 
     def explain_code(self, code, language=None, timeout=120):
-        """코드를 분석하고 설명을 생성"""
+        """Analyze the code and generate an explanation"""
         lang_info = f"The code is written in {language}. " if language else ""
 
         prompt = f"""
@@ -76,13 +76,13 @@ class CodeExplainer:
         try:
             start_time = time.time()
 
-            # 1. 프롬프트 저장
+            # 1. Save prompt to file
             prompt_file = os.path.join(os.getcwd(), "temp_prompt.txt")
             with open(prompt_file, "w", encoding="utf-8") as f:
                 f.write(prompt)
             logger.info(f"Saved prompt to {prompt_file}")
 
-            # 2. Non-streaming 테스트 요청
+            # 2. Non-streaming
             try:
                 logger.info("1. Non-streaming API 테스트")
                 test_response = requests.post(
@@ -99,22 +99,21 @@ class CodeExplainer:
             except Exception as e:
                 logger.error(f"Non-streaming API 테스트 실패: {str(e)}")
 
-            # 3. 실제 Streaming API 요청
+            # 3. Streaming API call
             logger.info("2. 스트리밍 API 호출 시작")
             response = requests.post(
                 self.api_url,
                 json={
                     "model": self.model_name,
                     "prompt": prompt,
-                    "stream": True
+                    "stream": False
                 },
-                stream=True,
                 timeout=timeout
             )
 
             logger.info(f"응답 상태 코드: {response.status_code}")
 
-            # 4. 응답 처리
+            # 4. response
             full_response = ""
             response_chunks = []
 
@@ -136,7 +135,7 @@ class CodeExplainer:
                     except Exception as e:
                         logger.warning(f"응답 처리 중 오류: {str(e)}")
 
-            # 5. 응답 결과 저장
+            # 5. Save response to file
             raw_response_file = os.path.join(os.getcwd(), "raw_response.txt")
             with open(raw_response_file, "w", encoding="utf-8") as f:
                 f.write("\n".join(response_chunks))

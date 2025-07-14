@@ -28,11 +28,6 @@
             Please write in a **concise and helpful** style that would benefit someone maintaining or learning from this code.
 
             ```
-            def process_numbers(numbers):
-    result = []
-    for n in numbers:
-        if n % 2 == 0:
-            result.append(n ** 2)
-    return result
+            print("Hello")
             ```
         

@@ -8,22 +8,22 @@ logger = logging.getLogger(__name__)
 class CodeGenerator:
     def __init__(self, model_name="qwen2.5-coder", ollama_base_url="http://localhost:11434"):
         """
-        코드 생성 클래스 초기화
+        Initialize the code generator class
         
         Args:
-            model_name (str): 사용할 Ollama 모델 이름
-            ollama_base_url (str): Ollama API 서버 URL
+            model_name (str): Name of the Ollama model to use
+            ollama_base_url (str): Ollama API server URL
         """
         self.model_name = model_name
         self.ollama_base_url = ollama_base_url
         self.api_url = f"{ollama_base_url}/api/generate"
         logger.info(f"CodeGenerator initialized with model: {model_name}")
         
-        # 모델이 준비되었는지 확인
+        # Check if the model is available
         self._check_model_availability()
         
     def _check_model_availability(self):
-        """모델이 로컬에 있는지 확인하고, 없으면 다운로드될 것임을 알림"""
+        """Check if the model is available locally, warn if it will be downloaded"""
         try:
             response = requests.get(f"{self.ollama_base_url}/api/tags")
             models = response.json().get("models", [])
@@ -39,26 +39,48 @@ class CodeGenerator:
 
     def generate_code(self, prompt, language=None, timeout=60):
         """
-        프롬프트를 기반으로 코드 생성
+        Generate code based on the prompt
         
         Args:
-            prompt (str): 코드 생성을 위한 요구사항 설명
-            language (str, optional): 생성할 코드 언어 (예: "python", "javascript")
-            timeout (int): 요청 타임아웃 시간(초)
+            prompt (str): Description of requirements for code generation
+            language (str, optional): Programming language for the generated code (e.g., "python", "javascript")
+            timeout (int): Request timeout in seconds
             
         Returns:
-            str: 생성된 코드
+            str: Generated code
         """
         if not prompt.strip():
-            return "코드 생성에 필요한 요구사항이 없습니다."
+            return "No requirements provided for code generation."
             
-        lang_instruction = f"{language} 프로그래밍 언어로 " if language else ""
-        system_prompt = f"""다음 요구사항에 맞는 {lang_instruction}코드를 생성해주세요. 
-코드만 출력하고, 코드는 반드시 마크다운 코드 블록(```) 안에 작성해주세요.
-코드는 실행 가능하고, 최적화된 방식으로 작성해주세요.
-주석을 포함하여 코드의 이해를 도와주세요."""
+        lang_instruction = f"in {language} programming language " if language else ""
+        include_comments = True  # Default to including comments unless specified otherwise
+        comment_instruction = (
+        "Include helpful inline comments to explain key logic and improve readability."
+        if include_comments else
+        "Do NOT include any comments, explanations, or annotations in the code."
+)
+        system_prompt = f"""
+    You are an expert software engineer.
+    Your task is to generate clean, optimized, and executable code {lang_instruction}that fulfills the user's requirements.
+    You must strictly follow the user's requirements.  
+    Prioritize fulfilling every detail mentioned by the user, even if there are simpler or more optimal alternatives.  
+    Do not make assumptions or replace requested approaches with your own preferences.  
+    Generate code exactly as specified, respecting all constraints and instructions.
 
-        full_prompt = f"{system_prompt}\n\n요구사항: {prompt}"
+    Guidelines:
+    - Output **only the code**, and wrap it in a valid markdown code block using triple backticks (```).
+    - The code must be **syntactically correct** and **ready to run**.
+    - The code should follow **best practices** in structure and performance.
+    - {comment_instruction}
+    - Absolutely DO NOT include any explanations, comments, or text outside the code block unless explicitly requested.
+    - If comments are not to be included, ensure the code contains ZERO comments or annotations.
+
+    Example output format:
+    '''{language or ""}
+    <your code here>'''
+        """
+
+        full_prompt = f"{system_prompt}\n\nRequirements: {prompt}"
         
         try:
             start_time = time.time()
@@ -80,7 +102,7 @@ class CodeGenerator:
             return result["response"]
         except requests.exceptions.Timeout:
             logger.error(f"Request timed out after {timeout} seconds")
-            return "요청 시간이 초과되었습니다. 더 간단한 요구사항으로 다시 시도해보세요."
+            return "The request timed out. Please try again with a simpler requirement."
         except Exception as e:
             logger.error(f"Error generating code: {str(e)}")
-            return f"코드 생성 중 오류가 발생했습니다: {str(e)}"
+            return f"An error occurred during code generation: {str(e)}"
