@@ -76,23 +76,21 @@ def main():
             print("\nEnter your code (type 'exit' or 'quit' to exit):")
             code_lines = []
             
-            # 첫 번째 줄 읽기
-            first_line = input()
-            if first_line.lower() in ['exit', 'quit']:
-                break
-                
-            code_lines.append(first_line)
-            
-            # 나머지 코드 읽기
             try:
                 while True:
                     line = input()
-                    if not line:  # 빈 줄이면 입력 종료
+                    # 종료 조건 추가: 줄 중간에 exit 또는 quit 입력 시 종료
+                    if line.strip().lower() in ['exit', 'quit']:
+                        print("Exiting the code explanation tool.")
+                        return 0
+                    if line == "":
+                        # 빈 줄이면 입력 종료
                         break
                     code_lines.append(line)
             except EOFError:
-                pass  # Ctrl+D 또는 Ctrl+Z로 입력 종료
-                
+                # Ctrl+D (Unix), Ctrl+Z (Windows) 입력 시 종료
+                pass  
+            
             code = "\n".join(code_lines)
             if not code.strip():
                 continue
