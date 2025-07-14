@@ -1,80 +1,160 @@
 import requests
-import json
 import time
+import json
 import logging
+import os
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# 로그 설정
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 class CodeExplainer:
+    """코드 설명 생성을 위한 클래스"""
+
     def __init__(self, model_name="qwen2.5-coder", ollama_base_url="http://localhost:11434"):
-        """
-        코드 설명 클래스 초기화
-        
-        Args:
-            model_name (str): 사용할 Ollama 모델 이름
-            ollama_base_url (str): Ollama API 서버 URL
-        """
         self.model_name = model_name
         self.ollama_base_url = ollama_base_url
         self.api_url = f"{ollama_base_url}/api/generate"
-        logger.info(f"CodeExplainer initialized with model: {model_name}")
-        
-        # 모델이 준비되었는지 확인
-        self._check_model_availability()
 
-    def _check_model_availability(self):
-        """모델이 로컬에 있는지 확인하고, 없으면 다운로드될 것임을 알림"""
+        logger.info(f"CodeExplainer initialized with model: {model_name}")
+
+        # 모델 가용성 확인
         try:
-            response = requests.get(f"{self.ollama_base_url}/api/tags")
-            models = response.json().get("models", [])
-            available_models = [model["name"] for model in models]
-            
-            if self.model_name not in available_models:
-                logger.warning(f"Model {self.model_name} is not available locally. It will be downloaded on first use.")
+            response = requests.get(f"{ollama_base_url}/api/tags")
+            if response.status_code == 200:
+                models = response.json().get("models", [])
+                model_names = [model.get("name") for model in models]
+
+                if model_name not in model_names:
+                    logger.warning(f"Model {model_name} is not available locally. It will be downloaded on first use.")
             else:
-                logger.info(f"Model {self.model_name} is available locally.")
+                logger.warning(f"Failed to check model availability: {response.status_code}")
         except Exception as e:
-            logger.error(f"Failed to check model availability: {e}")
-            logger.warning("Make sure Ollama server is running at: " + self.ollama_base_url)
-    
-    def explain_code(self, code, language=None, timeout=300):
+            logger.warning(f"Error checking model availability: {str(e)}")
+
+    def explain_code(self, code, language=None, timeout=120):
+        """코드를 분석하고 설명을 생성"""
+        lang_info = f"The code is written in {language}. " if language else ""
+
+        prompt = f"""
+            You are a professional code reviewer and software engineer.
+
+            Please analyze and explain the following {language or "code"} with **clarity and conciseness**. 
+            Structure your response in clean markdown with headings and bullet points. 
+            Avoid repeating information across sections.
+
+            ## 1. Purpose
+            - What is the main goal or function of this code?
+
+            ## 2. Key Components
+            - List important functions, classes, or modules and describe their roles.
+
+            ## 3. Logic Flow
+            - Describe the control flow or main steps of the program.
+
+            ## 4. Notable Features
+            - Mention any clever, unique, or advanced techniques used.
+
+            ## 5. Suggestions for Improvement
+                - Recommend any enhancements, such as:
+                - Code readability improvements
+                - Performance optimizations
+                - More Pythonic / idiomatic practices
+                - Refactoring opportunities
+                - Better error handling or logging
+
+            Please write in a **concise and helpful** style that would benefit someone maintaining or learning from this code.
+
+            ```{language or ""}
+            {code}
+            ```
         """
-        코드를 분석하고 설명 생성
-        
-        Args:
-            code (str): 설명할 코드
-            language (str, optional): 코드 언어 (예: "python", "javascript")
-            timeout (int): 요청 타임아웃 시간(초)
-            
-        Returns:
-            str: 코드에 대한 설명
-        """
-        if not code.strip():
-            return "설명할 코드가 없습니다."
-        
-        lang_info = f"{language} " if language else ""
-        prompt = f"""다음 {lang_info}코드를 상세히 분석하고 설명해주세요:
-        {code}
-        다음 형식으로 설명해주세요 :
-        1. 코드의 목적과 기능 2. 주요 로직 설명 3. 함수와 변수의 역할 4. 주의할 점이나 개선할 수 있는 부분"""
 
         try:
             start_time = time.time()
-            response = requests.post(self.api_url, json={
-                "model": self.model_name,
-                "prompt": prompt,
-                "stream": True
-            }, timeout=timeout)
 
-            response.raise_for_status()
-            result = response.json()
+            # 1. 프롬프트 저장
+            prompt_file = os.path.join(os.getcwd(), "temp_prompt.txt")
+            with open(prompt_file, "w", encoding="utf-8") as f:
+                f.write(prompt)
+            logger.info(f"Saved prompt to {prompt_file}")
+
+            # 2. Non-streaming 테스트 요청
+            try:
+                logger.info("1. Non-streaming API 테스트")
+                test_response = requests.post(
+                    self.api_url,
+                    json={
+                        "model": self.model_name,
+                        "prompt": "Say hello world",
+                        "stream": False
+                    },
+                    timeout=10
+                )
+                logger.info(f"Status code: {test_response.status_code}")
+                logger.info(f"Raw response: {test_response.text[:500]}")
+            except Exception as e:
+                logger.error(f"Non-streaming API 테스트 실패: {str(e)}")
+
+            # 3. 실제 Streaming API 요청
+            logger.info("2. 스트리밍 API 호출 시작")
+            response = requests.post(
+                self.api_url,
+                json={
+                    "model": self.model_name,
+                    "prompt": prompt,
+                    "stream": True
+                },
+                stream=True,
+                timeout=timeout
+            )
+
+            logger.info(f"응답 상태 코드: {response.status_code}")
+
+            # 4. 응답 처리
+            full_response = ""
+            response_chunks = []
+
+            for i, line in enumerate(response.iter_lines()):
+                if line:
+                    decoded_line = line.decode('utf-8')
+
+                    if i < 5:
+                        logger.info(f"Raw line {i}: {decoded_line}")
+
+                    response_chunks.append(decoded_line)
+
+                    try:
+                        json_line = json.loads(decoded_line)
+                        chunk = json_line.get("response", "")
+                        full_response += chunk
+                    except json.JSONDecodeError as je:
+                        logger.warning(f"JSON 파싱 오류: {je}, 라인: {decoded_line[:100]}")
+                    except Exception as e:
+                        logger.warning(f"응답 처리 중 오류: {str(e)}")
+
+            # 5. 응답 결과 저장
+            raw_response_file = os.path.join(os.getcwd(), "raw_response.txt")
+            with open(raw_response_file, "w", encoding="utf-8") as f:
+                f.write("\n".join(response_chunks))
+            logger.info(f"원시 응답을 {raw_response_file}에 저장했습니다")
+
             elapsed_time = time.time() - start_time
             logger.info(f"Code explanation generated in {elapsed_time:.2f} seconds")
-            return result["response"]
+
+            return full_response if full_response else "응답이 비어 있습니다. 자세한 내용은 로그를 확인하세요."
+
         except requests.exceptions.Timeout:
             logger.error(f"Request timed out after {timeout} seconds")
             return "요청 시간이 초과되었습니다. 더 짧은 코드로 다시 시도해보세요."
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request error: {str(e)}")
+            return f"API 요청 중 오류가 발생했습니다: {str(e)}"
+
         except Exception as e:
             logger.error(f"Error explaining code: {str(e)}")
             return f"코드 설명 중 오류가 발생했습니다: {str(e)}"

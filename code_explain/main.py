@@ -18,7 +18,7 @@ def main():
     
     model_name = args.model
     ollama_url = args.url
-    
+
     explainer = CodeExplainer(model_name=model_name, ollama_base_url=ollama_url)
     
     # 파일 경로가 제공된 경우
@@ -27,7 +27,7 @@ def main():
         try:
             # 파일이 존재하는지 확인
             if not os.path.exists(file_path):
-                print(f"파일을 찾을 수 없습니다: {file_path}")
+                print(f"can't find file: {file_path}")
                 return 1
                 
             # 파일에서 코드 읽기
@@ -58,22 +58,22 @@ def main():
             
             # 결과 출력
             print("\n" + "="*50 + "\n")
-            print(f"파일: {file_path}")
-            print(f"언어: {language if language else '자동 감지'}")
+            print(f"file: {file_path}")
+            print(f"language: {language if language else 'auto-detected'}")
             print("\n" + "="*50 + "\n")
             print(explanation)
             print("\n" + "="*50)
             
         except Exception as e:
-            print(f"오류 발생: {str(e)}")
+            print(f"Error occurred: {str(e)}")
             return 1
     else:
         # 대화형 모드
-        print("코드 설명 도구를 시작합니다. 종료하려면 'exit' 또는 'quit'를 입력하세요.")
-        print("코드를 입력하고 빈 줄에서 Ctrl+D(Unix) 또는 Ctrl+Z(Windows)를 입력하면 설명이 생성됩니다.")
+        print("Starting the code explanation tool. Type 'exit' or 'quit' to exit.")
+        print("Enter your code and press Enter on an empty line, then Ctrl+D (Unix) or Ctrl+Z (Windows) to generate an explanation.")
         
         while True:
-            print("\n코드를 입력하세요 (종료: exit 또는 quit):")
+            print("\nEnter your code (type 'exit' or 'quit' to exit):")
             code_lines = []
             
             # 첫 번째 줄 읽기
@@ -97,7 +97,7 @@ def main():
             if not code.strip():
                 continue
                 
-            print("\n코드 분석 중...\n")
+            print("\n analyzing code...\n")
             explanation = explainer.explain_code(code)
             
             print("\n" + "="*50 + "\n")

@@ -1,0 +1,38 @@
+
+            You are a professional code reviewer and software engineer.
+
+            Please analyze and explain the following code with **clarity and conciseness**. 
+            Structure your response in clean markdown with headings and bullet points. 
+            Avoid repeating information across sections.
+
+            ## 1. Purpose
+            - What is the main goal or function of this code?
+
+            ## 2. Key Components
+            - List important functions, classes, or modules and describe their roles.
+
+            ## 3. Logic Flow
+            - Describe the control flow or main steps of the program.
+
+            ## 4. Notable Features
+            - Mention any clever, unique, or advanced techniques used.
+
+            ## 5. Suggestions for Improvement
+                - Recommend any enhancements, such as:
+                - Code readability improvements
+                - Performance optimizations
+                - More Pythonic / idiomatic practices
+                - Refactoring opportunities
+                - Better error handling or logging
+
+            Please write in a **concise and helpful** style that would benefit someone maintaining or learning from this code.
+
+            ```
+            def process_numbers(numbers):
+    result = []
+    for n in numbers:
+        if n % 2 == 0:
+            result.append(n ** 2)
+    return result
+            ```
+        

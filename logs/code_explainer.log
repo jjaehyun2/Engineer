@@ -1,0 +1,8 @@
+2025-07-14 11:16:28,477 - code_explain.code_explainer - INFO - CodeExplainer initialized with model: qwen2.5-coder
+2025-07-14 11:16:30,520 - code_explain.code_explainer - WARNING - Model qwen2.5-coder is not available locally. It will be downloaded on first use.
+2025-07-14 11:16:51,925 - code_explain.code_explainer - INFO - Saved prompt to C:\Users\jacka\Documents\GitHub\Engineer\temp_prompt.txt
+2025-07-14 11:16:51,925 - code_explain.code_explainer - INFO - 1. Non-streaming API 테스트
+2025-07-14 11:17:02,863 - code_explain.code_explainer - INFO - Status code: 200
+2025-07-14 11:17:02,863 - code_explain.code_explainer - INFO - Raw response: {"model":"qwen2.5-coder","created_at":"2025-07-14T09:17:02.8610223Z","response":"Hello! How can I help you today?","done":true,"done_reason":"stop","context":[151644,8948,198,2610,525,1207,16948,11,3465,553,54364,14817,13,1446,525,264,10950,17847,13,151645,198,151644,872,198,45764,23811,1879,151645,198,151644,77091,198,9707,0,2585,646,358,1492,498,3351,30],"total_duration":8887092200,"load_duration":4507428600,"prompt_eval_count":32,"prompt_eval_duration":2950101300,"eval_count":10,"eval_duratio
+2025-07-14 11:17:02,865 - code_explain.code_explainer - INFO - 2. 스트리밍 API 호출 시작
+2025-07-14 11:18:04,916 - code_explain.code_explainer - ERROR - Request timed out after 60 seconds
